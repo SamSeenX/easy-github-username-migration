@@ -1,14 +1,14 @@
 #!/bin/bash
 #═══════════════════════════════════════════════════════════════════════════════
 # Easy GitHub Username Migration
-# https://github.com/YOUR_USERNAME/easy-github-username-migration
+# https://github.com/SamSeenX/easy-github-username-migration
 #═══════════════════════════════════════════════════════════════════════════════
 #
 # This script helps you migrate your GitHub username across all repositories.
 # It clones your repos, finds all references, shows a report, and only applies
 # changes after your confirmation.
 #
-# Usage: ./rengithub.sh [command]
+# Usage: ./migrate.sh [command]
 #   (no args)  - Run full migration workflow
 #   clone      - Clone repos only
 #   analyze    - Analyze and generate report
@@ -19,21 +19,12 @@
 #═══════════════════════════════════════════════════════════════════════════════
 
 #───────────────────────────────────────────────────────────────────────────────
-# CONFIGURATION - Edit these values!
-#───────────────────────────────────────────────────────────────────────────────
-
-OLD_NAME="mrsamseen"       # Your current/old GitHub username
-NEW_NAME="samseenio"       # Your new GitHub username
-
-#───────────────────────────────────────────────────────────────────────────────
 # Settings (usually don't need to change)
 #───────────────────────────────────────────────────────────────────────────────
 
 WORK_DIR="$HOME/github_migration"
 REPOS_FILE="$WORK_DIR/repos.txt"
-REPORT_FILE="$WORK_DIR/migration_report.txt"
-CHANGES_FILE="$WORK_DIR/pending_changes.txt"
-FINAL_REPORT="$WORK_DIR/final_report.txt"
+CONFIG_FILE="$WORK_DIR/.config"
 
 # Colors
 RED='\033[0;31m'
@@ -41,6 +32,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
@@ -48,6 +40,10 @@ NC='\033[0m' # No Color
 SUCCESS_COUNT=0
 FAILURE_COUNT=0
 SKIPPED_COUNT=0
+
+# Will be set by prompt or config
+OLD_NAME=""
+NEW_NAME=""
 
 #───────────────────────────────────────────────────────────────────────────────
 # Helper Functions
@@ -77,6 +73,25 @@ print_error() {
     echo -e "${RED}✗ $1${NC}"
 }
 
+# Get next sequential report filename
+get_next_report_file() {
+    local base_name="$1"
+    local extension="${base_name##*.}"
+    local name_without_ext="${base_name%.*}"
+    
+    if [[ ! -f "$base_name" ]]; then
+        echo "$base_name"
+        return
+    fi
+    
+    local counter=1
+    while [[ -f "${name_without_ext}_${counter}.${extension}" ]]; do
+        ((counter++))
+    done
+    
+    echo "${name_without_ext}_${counter}.${extension}"
+}
+
 show_help() {
     echo ""
     echo -e "${BOLD}Easy GitHub Username Migration${NC}"
@@ -91,18 +106,80 @@ show_help() {
     echo "  clean        Remove work directory"
     echo "  --help, -h   Show this help"
     echo ""
-    echo "Configuration:"
-    echo "  Edit the OLD_NAME and NEW_NAME variables at the top of this script"
+    echo "The script will interactively ask for your old and new usernames."
     echo ""
     echo "Work Directory: $WORK_DIR"
     echo ""
     echo "Example workflow:"
-    echo "  1. Edit this script to set OLD_NAME and NEW_NAME"
-    echo "  2. Run: ./rengithub.sh"
+    echo "  1. Run: ./migrate.sh"
+    echo "  2. Enter your old and new usernames when prompted"
     echo "  3. Edit ~/github_migration/repos.txt to add your repos"
-    echo "  4. Run: ./rengithub.sh again"
+    echo "  4. Run: ./migrate.sh again"
     echo ""
     exit 0
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Username Prompt
+#───────────────────────────────────────────────────────────────────────────────
+
+prompt_usernames() {
+    print_header "🔐 Username Configuration"
+    
+    # Check if we have saved config
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+        echo -e "Found saved configuration:"
+        echo -e "  Old username: ${YELLOW}$OLD_NAME${NC}"
+        echo -e "  New username: ${GREEN}$NEW_NAME${NC}"
+        echo ""
+        read -p "Use these settings? [Y/n]: " use_saved
+        if [[ "$use_saved" != "n" && "$use_saved" != "N" ]]; then
+            return
+        fi
+        echo ""
+    fi
+    
+    # Prompt for old username
+    echo -e "${BOLD}Enter your OLD GitHub username${NC}"
+    echo -e "${CYAN}(This is the username you're migrating FROM)${NC}"
+    read -p "Old username: " OLD_NAME
+    
+    if [[ -z "$OLD_NAME" ]]; then
+        print_error "Old username cannot be empty!"
+        exit 1
+    fi
+    
+    echo ""
+    
+    # Prompt for new username
+    echo -e "${BOLD}Enter your NEW GitHub username${NC}"
+    echo -e "${CYAN}(This is the username you're migrating TO)${NC}"
+    read -p "New username: " NEW_NAME
+    
+    if [[ -z "$NEW_NAME" ]]; then
+        print_error "New username cannot be empty!"
+        exit 1
+    fi
+    
+    echo ""
+    echo -e "Migration: ${YELLOW}$OLD_NAME${NC} → ${GREEN}$NEW_NAME${NC}"
+    echo ""
+    read -p "Is this correct? [Y/n]: " confirm
+    
+    if [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
+        prompt_usernames
+        return
+    fi
+    
+    # Save config for future runs
+    mkdir -p "$WORK_DIR"
+    cat > "$CONFIG_FILE" <<EOF
+# Easy GitHub Username Migration - Saved Configuration
+OLD_NAME="$OLD_NAME"
+NEW_NAME="$NEW_NAME"
+EOF
+    print_success "Configuration saved to $CONFIG_FILE"
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -112,18 +189,6 @@ show_help() {
 setup() {
     print_header "Phase 1: Setup"
 
-    # Validate configuration
-    if [[ "$OLD_NAME" == "your_old_username" ]] || [[ "$NEW_NAME" == "your_new_username" ]]; then
-        print_error "Please edit the script and set OLD_NAME and NEW_NAME!"
-        echo ""
-        echo "Open $(realpath "$0") and update these lines:"
-        echo ""
-        echo '  OLD_NAME="your_old_username"'
-        echo '  NEW_NAME="your_new_username"'
-        echo ""
-        exit 1
-    fi
-
     # Create work directory
     mkdir -p "$WORK_DIR/repos"
     print_success "Created work directory: $WORK_DIR"
@@ -131,7 +196,7 @@ setup() {
     # Check if repos.txt exists
     if [[ ! -f "$REPOS_FILE" ]]; then
         print_warning "repos.txt not found. Creating template..."
-        cat > "$REPOS_FILE" << EOF
+        cat > "$REPOS_FILE" << 'TEMPLATE'
 # Easy GitHub Username Migration - Repository List
 # ═══════════════════════════════════════════════════════════════
 # Add one repository name per line (just the repo name, not full URL)
@@ -143,20 +208,38 @@ setup() {
 # homebrew-tap
 #
 # ───────────────────────────────────────────────────────────────
-# TIP: Auto-populate with GitHub CLI:
+# TIP: Auto-populate with GitHub CLI (requires: brew install gh && gh auth login)
 #
-#   gh repo list $OLD_NAME --limit 100 --json name -q '.[].name' >> $REPOS_FILE
+# ┌─────────────────────────────────────────────────────────────┐
+# │  BEFORE changing your username on GitHub:                  │
+# │  Use the OLD username to fetch repos                       │
+# │                                                             │
+# │  gh repo list OLD_USERNAME --limit 100 \                   │
+# │     --json name -q '.[].name' >> ~/github_migration/repos.txt
+# └─────────────────────────────────────────────────────────────┘
 #
-# (requires: brew install gh && gh auth login)
+# ┌─────────────────────────────────────────────────────────────┐
+# │  AFTER changing your username on GitHub:                   │
+# │  Use the NEW username to fetch repos                       │
+# │                                                             │
+# │  gh repo list NEW_USERNAME --limit 100 \                   │
+# │     --json name -q '.[].name' >> ~/github_migration/repos.txt
+# └─────────────────────────────────────────────────────────────┘
+#
 # ═══════════════════════════════════════════════════════════════
 
-EOF
+TEMPLATE
         echo ""
         print_warning "Please edit the repos.txt file and add your repositories:"
         echo -e "  ${YELLOW}$REPOS_FILE${NC}"
         echo ""
-        echo "You can also auto-populate it with GitHub CLI:"
+        echo -e "${BOLD}Auto-populate with GitHub CLI:${NC}"
+        echo ""
+        echo -e "  ${MAGENTA}Before${NC} renaming on GitHub (use OLD username):"
         echo -e "  ${CYAN}gh repo list $OLD_NAME --limit 100 --json name -q '.[].name' >> $REPOS_FILE${NC}"
+        echo ""
+        echo -e "  ${MAGENTA}After${NC} renaming on GitHub (use NEW username):"
+        echo -e "  ${CYAN}gh repo list $NEW_NAME --limit 100 --json name -q '.[].name' >> $REPOS_FILE${NC}"
         echo ""
         exit 0
     fi
@@ -166,6 +249,15 @@ EOF
     if [[ "$repo_count" -eq 0 ]]; then
         print_warning "repos.txt is empty. Please add your repository names."
         echo -e "  ${YELLOW}$REPOS_FILE${NC}"
+        echo ""
+        echo -e "${BOLD}Auto-populate with GitHub CLI:${NC}"
+        echo ""
+        echo -e "  ${MAGENTA}Before${NC} renaming on GitHub (use OLD username):"
+        echo -e "  ${CYAN}gh repo list $OLD_NAME --limit 100 --json name -q '.[].name' >> $REPOS_FILE${NC}"
+        echo ""
+        echo -e "  ${MAGENTA}After${NC} renaming on GitHub (use NEW username):"
+        echo -e "  ${CYAN}gh repo list $NEW_NAME --limit 100 --json name -q '.[].name' >> $REPOS_FILE${NC}"
+        echo ""
         exit 0
     fi
 
@@ -199,12 +291,18 @@ clone_repos() {
 
         print_step "Cloning: $repo"
         
-        # Try HTTPS first, then SSH
-        if git clone "https://github.com/$OLD_NAME/$repo.git" "$repo_path" 2>/dev/null; then
-            print_success "Cloned: $repo"
+        # Try with NEW username first (if already renamed on GitHub), then OLD username
+        if git clone "https://github.com/$NEW_NAME/$repo.git" "$repo_path" 2>/dev/null; then
+            print_success "Cloned: $repo (from $NEW_NAME)"
+            ((clone_count++))
+        elif git clone "https://github.com/$OLD_NAME/$repo.git" "$repo_path" 2>/dev/null; then
+            print_success "Cloned: $repo (from $OLD_NAME)"
+            ((clone_count++))
+        elif git clone "git@github.com:$NEW_NAME/$repo.git" "$repo_path" 2>/dev/null; then
+            print_success "Cloned (SSH): $repo (from $NEW_NAME)"
             ((clone_count++))
         elif git clone "git@github.com:$OLD_NAME/$repo.git" "$repo_path" 2>/dev/null; then
-            print_success "Cloned (SSH): $repo"
+            print_success "Cloned (SSH): $repo (from $OLD_NAME)"
             ((clone_count++))
         else
             print_error "Failed to clone: $repo"
@@ -226,7 +324,14 @@ clone_repos() {
 analyze_repos() {
     print_header "Phase 3: Analyzing Repositories"
 
-    # Clear previous reports
+    # Get next available report filename (sequential numbering)
+    local REPORT_FILE=$(get_next_report_file "$WORK_DIR/migration_report.txt")
+    local CHANGES_FILE="${REPORT_FILE%.txt}_changes.txt"
+    
+    # Save current report paths for other phases
+    echo "CURRENT_REPORT_FILE=\"$REPORT_FILE\"" > "$WORK_DIR/.current_run"
+    echo "CURRENT_CHANGES_FILE=\"$CHANGES_FILE\"" >> "$WORK_DIR/.current_run"
+
     > "$REPORT_FILE"
     > "$CHANGES_FILE"
 
@@ -234,7 +339,7 @@ analyze_repos() {
     local total_occurrences=0
 
     echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
-    echo "  MIGRATION REPORT: $OLD_NAME → $NEW_NAME" >> "$REPORT_FILE"
+    echo "  MIGRATION REPORT: $OLD_NAME → $NEW_NAME (case-insensitive)" >> "$REPORT_FILE"
     echo "  Generated: $(date)" >> "$REPORT_FILE"
     echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
@@ -249,8 +354,8 @@ analyze_repos() {
         echo "Repository: $repo_name" >> "$REPORT_FILE"
         echo "───────────────────────────────────────────────────────────────" >> "$REPORT_FILE"
 
-        # Find all files with references (excluding .git and common ignored dirs)
-        local found_files=$(grep -r "$OLD_NAME" "$repo_path" \
+        # Find all files with references (case-insensitive with -i flag)
+        local found_files=$(grep -ri "$OLD_NAME" "$repo_path" \
             --exclude-dir=.git \
             --exclude-dir=node_modules \
             --exclude-dir=vendor \
@@ -297,13 +402,14 @@ analyze_repos() {
             [[ -z "$file" ]] && continue
 
             local rel_path="${file#$WORK_DIR/repos/}"
-            local count=$(grep -o "$OLD_NAME" "$file" 2>/dev/null | wc -l | xargs)
+            # Case-insensitive count
+            local count=$(grep -oi "$OLD_NAME" "$file" 2>/dev/null | wc -l | xargs)
 
             echo "  📄 $rel_path ($count occurrences)" >> "$REPORT_FILE"
             echo "$file" >> "$CHANGES_FILE"
 
-            # Show preview of changes (first 5 matches)
-            grep -n "$OLD_NAME" "$file" 2>/dev/null | head -5 | while read -r line; do
+            # Show preview of changes (first 5 matches, case-insensitive)
+            grep -ni "$OLD_NAME" "$file" 2>/dev/null | head -5 | while read -r line; do
                 echo "      $line" >> "$REPORT_FILE"
             done
 
@@ -321,7 +427,7 @@ analyze_repos() {
     echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
     echo "  Files to modify:    $total_files" >> "$REPORT_FILE"
     echo "  Total occurrences:  $total_occurrences" >> "$REPORT_FILE"
-    echo "  Old name:           $OLD_NAME" >> "$REPORT_FILE"
+    echo "  Old name:           $OLD_NAME (case-insensitive)" >> "$REPORT_FILE"
     echo "  New name:           $NEW_NAME" >> "$REPORT_FILE"
     echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
 
@@ -341,6 +447,14 @@ analyze_repos() {
 
 show_report_and_confirm() {
     print_header "Phase 4: Review Changes"
+
+    # Load current run paths
+    if [[ -f "$WORK_DIR/.current_run" ]]; then
+        source "$WORK_DIR/.current_run"
+        local REPORT_FILE="$CURRENT_REPORT_FILE"
+    else
+        local REPORT_FILE="$WORK_DIR/migration_report.txt"
+    fi
 
     echo "Here's a preview of the changes:"
     echo ""
@@ -383,6 +497,18 @@ show_report_and_confirm() {
 apply_changes() {
     print_header "Phase 5: Applying Changes"
 
+    # Load current run paths
+    if [[ -f "$WORK_DIR/.current_run" ]]; then
+        source "$WORK_DIR/.current_run"
+        local CHANGES_FILE="$CURRENT_CHANGES_FILE"
+        local REPORT_FILE="$CURRENT_REPORT_FILE"
+    else
+        local CHANGES_FILE="$WORK_DIR/pending_changes.txt"
+        local REPORT_FILE="$WORK_DIR/migration_report.txt"
+    fi
+    
+    local FINAL_REPORT=$(get_next_report_file "$WORK_DIR/final_report.txt")
+
     > "$FINAL_REPORT"
     echo "═══════════════════════════════════════════════════════════════" >> "$FINAL_REPORT"
     echo "  FINAL MIGRATION REPORT" >> "$FINAL_REPORT"
@@ -390,27 +516,30 @@ apply_changes() {
     echo "═══════════════════════════════════════════════════════════════" >> "$FINAL_REPORT"
     echo "" >> "$FINAL_REPORT"
 
-    # First, update all files
-    print_step "Updating file contents..."
+    # First, update all files (case-insensitive replacement)
+    print_step "Updating file contents (case-insensitive)..."
 
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
         [[ ! -f "$file" ]] && continue
 
-        # Detect OS for sed compatibility
-        if [[ "$(uname)" == "Darwin" ]]; then
-            # macOS
-            if sed -i '' "s|$OLD_NAME|$NEW_NAME|g" "$file" 2>/dev/null; then
-                print_success "Updated: ${file#$WORK_DIR/repos/}"
-            else
-                print_error "Failed to update: ${file#$WORK_DIR/repos/}"
-            fi
+        # Case-insensitive replacement using perl (works on both macOS and Linux)
+        if perl -pi -e "s/$OLD_NAME/$NEW_NAME/gi" "$file" 2>/dev/null; then
+            print_success "Updated: ${file#$WORK_DIR/repos/}"
         else
-            # Linux
-            if sed -i "s|$OLD_NAME|$NEW_NAME|g" "$file" 2>/dev/null; then
-                print_success "Updated: ${file#$WORK_DIR/repos/}"
+            # Fallback to sed (case-sensitive) if perl fails
+            if [[ "$(uname)" == "Darwin" ]]; then
+                if sed -i '' "s/$OLD_NAME/$NEW_NAME/gi" "$file" 2>/dev/null; then
+                    print_success "Updated: ${file#$WORK_DIR/repos/}"
+                else
+                    print_error "Failed to update: ${file#$WORK_DIR/repos/}"
+                fi
             else
-                print_error "Failed to update: ${file#$WORK_DIR/repos/}"
+                if sed -i "s/$OLD_NAME/$NEW_NAME/gi" "$file" 2>/dev/null; then
+                    print_success "Updated: ${file#$WORK_DIR/repos/}"
+                else
+                    print_error "Failed to update: ${file#$WORK_DIR/repos/}"
+                fi
             fi
         fi
     done < "$CHANGES_FILE"
@@ -437,7 +566,7 @@ apply_changes() {
 
         # Update remote URL to new username
         local old_remote=$(git -C "$repo_path" remote get-url origin 2>/dev/null)
-        local new_remote="${old_remote//$OLD_NAME/$NEW_NAME}"
+        local new_remote=$(echo "$old_remote" | sed "s/$OLD_NAME/$NEW_NAME/gi")
         git -C "$repo_path" remote set-url origin "$new_remote" 2>/dev/null
 
         # Stage, commit, and push
@@ -472,6 +601,9 @@ See: https://github.com/$NEW_NAME" 2>/dev/null; then
     echo "  ❌ Failed:     $FAILURE_COUNT" >> "$FINAL_REPORT"
     echo "  ⏭️  Skipped:    $SKIPPED_COUNT" >> "$FINAL_REPORT"
     echo "═══════════════════════════════════════════════════════════════" >> "$FINAL_REPORT"
+    
+    # Save final report path
+    echo "FINAL_REPORT_FILE=\"$FINAL_REPORT\"" >> "$WORK_DIR/.current_run"
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -480,6 +612,16 @@ See: https://github.com/$NEW_NAME" 2>/dev/null; then
 
 show_final_report() {
     print_header "Phase 6: Migration Complete!"
+
+    # Load current run paths
+    if [[ -f "$WORK_DIR/.current_run" ]]; then
+        source "$WORK_DIR/.current_run"
+        local FINAL_REPORT="${FINAL_REPORT_FILE:-$WORK_DIR/final_report.txt}"
+        local REPORT_FILE="${CURRENT_REPORT_FILE:-$WORK_DIR/migration_report.txt}"
+    else
+        local FINAL_REPORT="$WORK_DIR/final_report.txt"
+        local REPORT_FILE="$WORK_DIR/migration_report.txt"
+    fi
 
     cat "$FINAL_REPORT"
 
@@ -520,25 +662,9 @@ show_final_report() {
 #───────────────────────────────────────────────────────────────────────────────
 
 main() {
-    print_header "🔄 Easy GitHub Username Migration"
-    echo "  From: $OLD_NAME"
-    echo "  To:   $NEW_NAME"
-    echo ""
-
     case "${1:-}" in
         --help|-h)
             show_help
-            ;;
-        clone)
-            setup
-            clone_repos
-            ;;
-        analyze)
-            analyze_repos
-            ;;
-        apply)
-            apply_changes
-            show_final_report
             ;;
         clean)
             print_warning "This will delete: $WORK_DIR"
@@ -549,12 +675,36 @@ main() {
             fi
             ;;
         *)
-            setup
-            clone_repos
-            analyze_repos
-            show_report_and_confirm
-            apply_changes
-            show_final_report
+            # Always prompt for usernames first
+            prompt_usernames
+            
+            print_header "🔄 Easy GitHub Username Migration"
+            echo "  From: $OLD_NAME"
+            echo "  To:   $NEW_NAME"
+            echo ""
+
+            case "${1:-}" in
+                clone)
+                    setup
+                    clone_repos
+                    ;;
+                analyze)
+                    setup
+                    analyze_repos
+                    ;;
+                apply)
+                    apply_changes
+                    show_final_report
+                    ;;
+                *)
+                    setup
+                    clone_repos
+                    analyze_repos
+                    show_report_and_confirm
+                    apply_changes
+                    show_final_report
+                    ;;
+            esac
             ;;
     esac
 }
