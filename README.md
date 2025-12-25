@@ -1,10 +1,10 @@
-# RenGitHub - Safely Change Your GitHub Username
+# Easy GitHub Username Migration
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue.svg)]()
 [![Shell](https://img.shields.io/badge/Shell-Bash-orange.svg)]()
 
-**RenGitHub** is a powerful bash script that helps you safely migrate your GitHub username across all your repositories. It clones your repos, finds all references to your old username, shows you a detailed report, and only applies changes after your confirmation.
+I recently changed my GitHub username and realized there's no easy way to update all the references scattered across my repositories — README links, git remotes, package configs, you name it. So I built **easy-github-username-migration** to handle it for me. It clones all your repos, finds every reference to your old username, shows you exactly what it'll change, and only applies updates after you confirm. I figured if I needed this, others probably do too — so here it is!
 
 ## 🤔 Why Change Your GitHub Username?
 
@@ -64,9 +64,9 @@ When you change your username on GitHub:
 
 ### 1. Clone this repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/RenGitHub.git
-cd RenGitHub
-chmod +x rengithub.sh
+git clone https://github.com/YOUR_USERNAME/easy-github-username-migration.git
+cd easy-github-username-migration
+chmod +x migrate.sh
 ```
 
 ### 2. Configure your usernames
@@ -78,7 +78,7 @@ NEW_NAME="your_new_username"
 
 ### 3. First run (creates repos.txt template)
 ```bash
-./rengithub.sh
+./migrate.sh
 ```
 This creates `~/github_migration/repos.txt` - add your repository names there.
 
@@ -94,7 +94,7 @@ gh repo list YOUR_OLD_USERNAME --limit 100 --json name -q '.[].name' >> ~/github
 
 ### 5. Run the migration
 ```bash
-./rengithub.sh
+./migrate.sh
 ```
 
 The script will:
@@ -126,20 +126,20 @@ The script will:
 
 ```bash
 # Step 1: Clone the tool
-git clone https://github.com/YOUR_USERNAME/RenGitHub.git
-cd RenGitHub
+git clone https://github.com/YOUR_USERNAME/easy-github-username-migration.git
+cd easy-github-username-migration
 
 # Step 2: Edit configuration
-nano rengithub.sh  # Change OLD_NAME and NEW_NAME
+nano migrate.sh  # Change OLD_NAME and NEW_NAME
 
 # Step 3: First run - creates repos list
-./rengithub.sh
+./migrate.sh
 
 # Step 4: Edit repos list (or use gh CLI to auto-fill)
 nano ~/github_migration/repos.txt
 
 # Step 5: Run full migration
-./rengithub.sh
+./migrate.sh
 
 # Step 6: Review report and confirm when prompted
 ```
@@ -148,12 +148,12 @@ nano ~/github_migration/repos.txt
 
 | Command | Description |
 |---------|-------------|
-| `./rengithub.sh` | Run full migration workflow |
-| `./rengithub.sh clone` | Clone repos only |
-| `./rengithub.sh analyze` | Analyze and generate report |
-| `./rengithub.sh apply` | Apply changes (requires prior analysis) |
-| `./rengithub.sh clean` | Remove work directory |
-| `./rengithub.sh --help` | Show help |
+| `./migrate.sh` | Run full migration workflow |
+| `./migrate.sh clone` | Clone repos only |
+| `./migrate.sh analyze` | Analyze and generate report |
+| `./migrate.sh apply` | Apply changes (requires prior analysis) |
+| `./migrate.sh clean` | Remove work directory |
+| `./migrate.sh --help` | Show help |
 
 ## 📁 Work Directory Structure
 

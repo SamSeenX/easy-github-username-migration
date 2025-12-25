@@ -1,7 +1,7 @@
 #!/bin/bash
 #═══════════════════════════════════════════════════════════════════════════════
-# RenGitHub - Safely Change Your GitHub Username
-# https://github.com/YOUR_USERNAME/RenGitHub
+# Easy GitHub Username Migration
+# https://github.com/YOUR_USERNAME/easy-github-username-migration
 #═══════════════════════════════════════════════════════════════════════════════
 #
 # This script helps you migrate your GitHub username across all repositories.
@@ -79,7 +79,7 @@ print_error() {
 
 show_help() {
     echo ""
-    echo -e "${BOLD}RenGitHub - Safely Change Your GitHub Username${NC}"
+    echo -e "${BOLD}Easy GitHub Username Migration${NC}"
     echo ""
     echo "Usage: $0 [command]"
     echo ""
@@ -132,7 +132,7 @@ setup() {
     if [[ ! -f "$REPOS_FILE" ]]; then
         print_warning "repos.txt not found. Creating template..."
         cat > "$REPOS_FILE" << EOF
-# RenGitHub - Repository List
+# Easy GitHub Username Migration - Repository List
 # ═══════════════════════════════════════════════════════════════
 # Add one repository name per line (just the repo name, not full URL)
 # Lines starting with # are ignored
@@ -520,7 +520,7 @@ show_final_report() {
 #───────────────────────────────────────────────────────────────────────────────
 
 main() {
-    print_header "🔄 RenGitHub - GitHub Username Migration Tool"
+    print_header "🔄 Easy GitHub Username Migration"
     echo "  From: $OLD_NAME"
     echo "  To:   $NEW_NAME"
     echo ""
