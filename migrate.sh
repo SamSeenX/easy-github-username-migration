@@ -572,7 +572,7 @@ apply_changes() {
         # Stage, commit, and push
         git -C "$repo_path" add -A 2>/dev/null
 
-        if git -C "$repo_path" commit -m "chore: migrate username from $OLD_NAME to $NEW_NAME
+        if git -C "$repo_path" commit -m "chore: migrate username from $OLD_NAME to $NEW_NAME [skip ci]
 
 Updated all references to reflect the new GitHub username.
 See: https://github.com/$NEW_NAME" 2>/dev/null; then

@@ -218,6 +218,7 @@ If this tool saved you hours of manual work, consider:
 - ⭐ Starring this repository
 - 🐛 Reporting issues
 - 💡 Suggesting improvements
+- ☕ Supporting me on [BuyMeACoffee](https://buymeacoffee.com/samseen)
 
 ---
 
